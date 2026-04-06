@@ -182,7 +182,7 @@ app.set("trust proxy", 1);
 
 // ✅ CORS (FIXED)
 const allowedOrigins = [
-  "http://localhost:5173",
+  // "http://localhost:5173",
   "https://forknightt.netlify.app",
 ];
 
