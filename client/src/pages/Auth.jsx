@@ -25,36 +25,19 @@ export default function GitHubAuthPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get("code");
+  // ✅ ONLY correct OAuth trigger
+  const handleConnect = () => {
+    const API_URL = import.meta.env.VITE_API_URL;
+    window.location.href = `${API_URL}/auth/github`;
+  };
 
-    if (code) {
-      setIsLoading(true);
-      fetch("http://localhost:5000/auth/github", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code }),
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          setIsLoading(false);
-          if (data.success) {
-            setIsSuccess(true);
-            setTimeout(() => {
-              window.location.href = "/";
-            }, 2000);
-          } else {
-            alert("Authorization failed.");
-          }
-        })
-        .catch((err) => {
-          console.error(err);
-          setIsLoading(false);
-          alert("Something went wrong.");
-        });
-    }
-  }, []);
+  const handleCloseAuth = () => {
+    setShowGitHubAuth(false);
+  };
+
+  const handleCancel = () => {
+    window.location.href = "/";
+  };
 
   const permissions = [
     {
@@ -91,28 +74,28 @@ export default function GitHubAuthPage() {
     },
   ];
 
-  const handleConnect = () => {
-    const clientId = import.meta.env.VITE_GITHUB_CLIENT_ID;
-    const redirectUri = "http://localhost:5144";
-    window.location.href = "http://localhost:5000/auth/github";
-  };
+  // const handleConnect = () => {
+  //   const clientId = import.meta.env.VITE_GITHUB_CLIENT_ID;
+  //   const redirectUri = "http://localhost:5144";
+  //   window.location.href = "http://localhost:5000/auth/github";
+  // };
 
-  const handleCloseAuth = () => {
-    setShowGitHubAuth(false);
-  };
+  // const handleCloseAuth = () => {
+  //   setShowGitHubAuth(false);
+  // };
 
-  const handleAuthorize = () => {
-    const clientId = import.meta.env.VITE_GITHUB_CLIENT_ID;
-    const redirectUri = "http://localhost:5144"; // or 5173 or your Vercel URL
+  // const handleAuthorize = () => {
+  //   const clientId = import.meta.env.VITE_GITHUB_CLIENT_ID;
+  //   const redirectUri = "http://localhost:5144"; // or 5173 or your Vercel URL
 
-    const githubOAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=read:user repo`;
+  //   const githubOAuthUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&scope=read:user repo`;
 
-    window.location.href = githubOAuthUrl;
-  };
+  //   window.location.href = githubOAuthUrl;
+  // };
 
-  const handleCancel = () => {
-    window.history.back();
-  };
+  // const handleCancel = () => {
+  //   window.history.back();
+  // };
 
   // GitHub OAuth Popup Component - ForkNight themed
   const GitHubAuthPopup = () => (
