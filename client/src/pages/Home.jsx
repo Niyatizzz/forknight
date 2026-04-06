@@ -26,6 +26,11 @@ const Home = () => {
     "Repositories",
     "Code Reviews",
   ];
+
+  const handleConnect = () => {
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://forknight.onrender.com";
+    window.location.href = `${API_BASE_URL}/auth/github`;
+  };
   const currentWord = words[currentWordIndex];
 
   // Initialize particles
@@ -364,7 +369,7 @@ const Home = () => {
             style={{ animationDelay: "0.9s" }}
           >
             <button
-              onClick={() => navigate("/auth")}
+              onClick={handleConnect}
               className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-8 py-4 rounded-lg font-semibold text-lg flex items-center space-x-2 hover:from-purple-700 hover:to-pink-700 transition-all transform hover:scale-105 shadow-lg animate-glow"
             >
               <Github className="w-5 h-5" />
