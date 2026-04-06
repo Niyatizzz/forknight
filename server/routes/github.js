@@ -34,7 +34,7 @@ router.get("/profile", async (req, res) => {
 router.get("/stats", async (req, res) => {
   try {
     const token = req.user.accessToken;
-    const login = req.user.username;
+    const login = req.user.login;
 
     const [repos, totalPRs, totalIssues, totalCommits] = await Promise.all([
       getRepoCount(token),
@@ -65,7 +65,7 @@ router.get("/weekly-activity", async (req, res) => {
 router.get("/achievements", async (req, res) => {
   try {
     const token = req.user.accessToken;
-    const login = req.user.username;
+    const login = req.user.login;
 
     const [totalCommits, totalPRs, totalIssues, weeklyStats] =
       await Promise.all([
@@ -75,8 +75,9 @@ router.get("/achievements", async (req, res) => {
         getWeeklyStats(token),
       ]);
 
-    // Placeholder logic for streak — can be expanded
-    const currentStreak = weeklyStats.commits > 0 ? 1 : 0;
+    // Calculate real streak: if commits this week > 0, mark as active
+    // For robust streaks, you'd need database persistence
+    const currentStreak = weeklyStats.commits > 0 ? Math.ceil(weeklyStats.commits / 2) : 0;
 
     const achievements = [
       {

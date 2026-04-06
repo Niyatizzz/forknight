@@ -171,6 +171,7 @@ import dotenv from "dotenv";
 import session from "express-session";
 import passport from "passport";
 import GitHubStrategy from "passport-github2";
+import githubRoutes from "./routes/github.js";
 
 dotenv.config();
 
@@ -264,6 +265,9 @@ app.get("/api/user", (req, res) => {
     res.status(401).json({ message: "Not authenticated" });
   }
 });
+
+// ✅ MOUNT GITHUB ROUTES
+app.use("/api/github", githubRoutes);
 
 // ✅ GITHUB DATA
 app.get("/api/github/data", async (req, res) => {
