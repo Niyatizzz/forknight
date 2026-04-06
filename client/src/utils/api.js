@@ -1,5 +1,5 @@
 // src/utils/api.js
-const BASE = import.meta.env.VITE_API_BASE_URL || "https://forknight.onrender.com";
+const BASE = import.meta.env.VITE_API_BASE_URL || "https://forknight-server.onrender.com";
 
 export const apiGet = async (path) => {
   const res = await fetch(`${BASE}${path}`, {
