@@ -263,16 +263,32 @@ app.get(
 );
 
 // ✅ CALLBACK (FIXED REDIRECT)
-app.get(
-  "/auth/github/callback",
-  passport.authenticate("github", {
-    failureRedirect: "https://forknightt.netlify.app",
-  }),
-  (req, res) => {
-    // 🔥 ALWAYS redirect to frontend (NO origin logic)
-    res.redirect("https://forknightt.netlify.app/dashboard");
-  },
-);
+app.get("/auth/github/callback", (req, res, next) => {
+  passport.authenticate(
+    "github",
+    {
+      failureRedirect: "https://forknightt.netlify.app",
+      callbackURL: process.env.GITHUB_CALLBACK_URL,
+    },
+    (err, user, info) => {
+      if (err) {
+        console.error("GitHub callback error:", err);
+        return res.status(500).send("GitHub authentication failed.");
+      }
+      if (!user) {
+        console.error("GitHub callback did not return a user:", info);
+        return res.redirect("https://forknightt.netlify.app");
+      }
+      req.logIn(user, (loginErr) => {
+        if (loginErr) {
+          console.error("req.logIn error:", loginErr);
+          return res.status(500).send("Login failed.");
+        }
+        return res.redirect("https://forknightt.netlify.app/dashboard");
+      });
+    },
+  )(req, res, next);
+});
 
 // ✅ USER CHECK
 app.get("/api/user", (req, res) => {
