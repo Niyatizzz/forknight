@@ -242,6 +242,16 @@ app.get("/", (req, res) => {
 // ✅ LOGIN ROUTE
 app.get(
   "/auth/github",
+  (req, res, next) => {
+    console.log("👉 HIT /auth/github");
+    console.log("CLIENT ID:", process.env.GITHUB_CLIENT_ID);
+
+    if (!process.env.GITHUB_CLIENT_ID) {
+      return res.send("❌ Missing GITHUB_CLIENT_ID");
+    }
+
+    next();
+  },
   passport.authenticate("github", { scope: ["user:email"] }),
 );
 
