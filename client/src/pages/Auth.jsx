@@ -17,9 +17,6 @@ import {
   ArrowLeft,
 } from "lucide-react";
 
-//import client id
-const clientId = import.meta.env.VITE_GITHUB_CLIENT_ID;
-
 export default function GitHubAuthPage() {
   const [showGitHubAuth, setShowGitHubAuth] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,8 +24,8 @@ export default function GitHubAuthPage() {
 
   // ✅ ONLY correct OAuth trigger
   const handleConnect = () => {
-    const API_URL = import.meta.env.VITE_API_URL || "https://forknight-server.onrender.com";
-    window.location.href = `${API_URL}/auth/github`;
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://forknight-server.onrender.com";
+    window.location.href = `${API_BASE_URL}/auth/github`;
   };
 
   const handleCloseAuth = () => {
@@ -150,7 +147,7 @@ export default function GitHubAuthPage() {
             Cancel
           </button>
           <button
-            onClick={handleAuthorize}
+            onClick={handleConnect}
             className="flex-1 px-4 py-3 bg-gradient-to-r from-pink-500 to-purple-600 text-white rounded-xl hover:from-pink-600 hover:to-purple-700 transition-colors font-semibold"
           >
             Authorize
