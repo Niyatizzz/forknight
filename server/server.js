@@ -245,14 +245,21 @@ app.get(
   (req, res, next) => {
     console.log("👉 HIT /auth/github");
     console.log("CLIENT ID:", process.env.GITHUB_CLIENT_ID);
+    console.log("CALLBACK URL:", process.env.GITHUB_CALLBACK_URL);
 
     if (!process.env.GITHUB_CLIENT_ID) {
       return res.send("❌ Missing GITHUB_CLIENT_ID");
     }
+    if (!process.env.GITHUB_CALLBACK_URL) {
+      return res.send("❌ Missing GITHUB_CALLBACK_URL");
+    }
 
     next();
   },
-  passport.authenticate("github", { scope: ["user:email"] }),
+  passport.authenticate("github", {
+    scope: ["user:email"],
+    callbackURL: process.env.GITHUB_CALLBACK_URL,
+  }),
 );
 
 // ✅ CALLBACK (FIXED REDIRECT)
