@@ -10,7 +10,6 @@ import {
   Code,
   Award,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 
 const Home = () => {
   const [typedText, setTypedText] = useState("");
@@ -18,7 +17,6 @@ const Home = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [showStats, setShowStats] = useState(false);
   const [particles, setParticles] = useState([]);
-  const navigate = useNavigate();
   const words = [
     "Commits",
     "Pull Requests",
@@ -322,7 +320,7 @@ const Home = () => {
             How It Works
           </a>
           <button
-            onClick={() => navigate("/auth")}
+            onClick={handleConnect}
             className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-2 rounded-lg font-medium hover:from-purple-700 hover:to-pink-700 transition-all transform hover:scale-105 animate-glow"
           >
             Get Started
