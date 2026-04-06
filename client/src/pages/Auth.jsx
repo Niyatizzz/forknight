@@ -24,8 +24,7 @@ export default function GitHubAuthPage() {
 
   // ✅ ONLY correct OAuth trigger
   const handleConnect = () => {
-    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://forknight-server.onrender.com";
-    window.location.href = `${API_BASE_URL}/auth/github`;
+    window.location.href = "https://forknight.onrender.com/auth/github";
   };
 
   const handleCloseAuth = () => {
