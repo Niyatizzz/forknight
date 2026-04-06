@@ -264,6 +264,9 @@ app.get(
 
 // ✅ CALLBACK (FIXED REDIRECT)
 app.get("/auth/github/callback", (req, res, next) => {
+  console.log("👉 HIT /auth/github/callback");
+  console.log("CALLBACK URL:", process.env.GITHUB_CALLBACK_URL);
+
   passport.authenticate(
     "github",
     {
@@ -273,16 +276,22 @@ app.get("/auth/github/callback", (req, res, next) => {
     (err, user, info) => {
       if (err) {
         console.error("GitHub callback error:", err);
-        return res.status(500).send("GitHub authentication failed.");
+        return res.status(500).send(
+          `GitHub authentication failed: ${err.message || err}. callbackURL=${process.env.GITHUB_CALLBACK_URL}`,
+        );
       }
       if (!user) {
         console.error("GitHub callback did not return a user:", info);
-        return res.redirect("https://forknightt.netlify.app");
+        return res.status(500).send(
+          `GitHub callback did not return a user: ${JSON.stringify(info)}. callbackURL=${process.env.GITHUB_CALLBACK_URL}`,
+        );
       }
       req.logIn(user, (loginErr) => {
         if (loginErr) {
           console.error("req.logIn error:", loginErr);
-          return res.status(500).send("Login failed.");
+          return res.status(500).send(
+            `Login failed: ${loginErr.message || loginErr}. callbackURL=${process.env.GITHUB_CALLBACK_URL}`,
+          );
         }
         return res.redirect("https://forknightt.netlify.app/dashboard");
       });
