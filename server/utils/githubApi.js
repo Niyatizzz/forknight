@@ -85,6 +85,15 @@ export const getTotalCommits = async (token) => {
     .totalContributions;
 };
 
+/**
+ * Fetch the most recent public events for a user (up to 100).
+ * Used for streak calculation.
+ */
+export const getRecentEvents = async (token, login) => {
+  const data = await callRest(token, `/users/${login}/events`, { per_page: 100 });
+  return Array.isArray(data) ? data : [];
+};
+
 /** Get total stats for past 7 days */
 export const getWeeklyStats = async (token) => {
   const to = dayjs().endOf("day").toISOString();

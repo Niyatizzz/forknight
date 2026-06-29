@@ -210,7 +210,7 @@ const Dashboard = () => {
       return true;
     })
     .filter((achievement) =>
-      achievement.name.toLowerCase().includes(achievementSearch.toLowerCase())
+      (achievement.title || achievement.name || "").toLowerCase().includes(achievementSearch.toLowerCase())
     );
 
   // Group achievements by category if needed
@@ -235,47 +235,54 @@ const Dashboard = () => {
     percentage,
   };
   const [totalXP, setTotalXP] = useState(0);
-  /* still static for now */
-  // Update the challenges section in the useEffect
+
+  // ── Load dashboard data ───────────────────────────────────────────────────
+  // Strategy:
+  //   1. Hit /api/github/progress to see if we have a synced record in MongoDB.
+  //   2. If not found (404), trigger /api/github/sync automatically (first login).
+  //   3. Then load the rest of the data in parallel from MongoDB-backed endpoints.
   useEffect(() => {
     const load = async () => {
       try {
-        const [profile, stats, weekly, ach, repoList, challengeList] =
+        // Step 1 — try reading persisted progress
+        let progress;
+        try {
+          progress = await apiGet("/api/github/progress");
+        } catch (e) {
+          if (e.message.includes("404")) {
+            // First login — kick off initial sync
+            const syncResult = await apiPost("/api/github/sync", {});
+            progress = syncResult.progress;
+          } else {
+            throw e;
+          }
+        }
+
+        // Step 2 — load remaining data in parallel (all MongoDB-backed except
+        //           weekly-activity, challenges and repos which still call GitHub)
+        const [profile, weekly, ach, repoList, challengeList] =
           await Promise.all([
             apiGet("/api/github/profile"),
-            apiGet("/api/github/stats"),
             apiGet("/api/github/weekly-activity"),
             apiGet("/api/github/achievements"),
             apiGet("/api/github/repos"),
             apiGet("/api/github/challenges"),
           ]);
 
-        // Store locally
-        const xpFromAchievements = ach.totalXP;
-        setTotalXP(xpFromAchievements); // also update state in case you need it elsewhere
-
-        const getRankFromXP = (xp) => {
-          if (xp >= 800) return "Legendary Coder";
-          if (xp >= 600) return "Elite Contributor";
-          if (xp >= 450) return "Pro Hacker";
-          if (xp >= 350) return "Skilled Dev";
-          if (xp >= 200) return "Code Explorer";
-          if (xp >= 100) return "Rookie Committer";
-          return "Newbie";
-        };
-        const totalXP = stats.totalCommits + xpFromAchievements;
+        // Step 3 — build user state from server-computed progress
+        setTotalXP(progress.xp);
 
         setUser({
-          name: profile.name || profile.login,
-          level: calcLevel(totalXP),
-          xp: totalXP,
-          xpToNext: 100 - (totalXP % 100),
-          streak: weekly.commits, // still weekly commit count
-          dayStreak: challengeList?.debug?.commitStreak ?? 0, // ✅ add this line
-          totalCommits: stats.totalCommits,
-          totalPRs: stats.totalPRs,
-          totalRepos: stats.repos,
-          rank: getRankFromXP(totalXP),
+          name:         profile.name || profile.login,
+          level:        progress.level,
+          xp:           progress.xp,
+          xpToNext:     progress.xpToNext,
+          streak:       weekly.commits,     // weekly commit count for display
+          dayStreak:    progress.streak,    // persisted streak from MongoDB
+          totalCommits: progress.totalCommits,
+          totalPRs:     progress.totalPRs,
+          totalRepos:   progress.totalPRs !== undefined ? (repoList?.length ?? 0) : 0,
+          rank:         progress.rank,
         });
 
         setWeeklyStats(weekly);
@@ -397,10 +404,6 @@ const Dashboard = () => {
         return <Code className="w-5 h-5" />;
     }
   };
-  const calcLevel = (xp) => Math.floor(xp / 50) + 1;
-
-  /* helper to pick an icon for challenges */
-
   /* ───── loading / error fallbacks ───── */
   if (loading) {
     return (

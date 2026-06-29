@@ -5,8 +5,13 @@ import session from "express-session";
 import passport from "passport";
 import GitHubStrategy from "passport-github2";
 import githubRoutes from "./routes/github.js";
+import connectDB from "./config/db.js";
+import autoSync from "./middleware/autoSync.js";
 
 dotenv.config();
+
+// Connect to MongoDB at startup
+connectDB();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -95,6 +100,7 @@ app.get(
   passport.authenticate("github", {
     failureRedirect: "/login",
   }),
+  autoSync, // run initial sync for brand-new users (no-op for returning users)
   (req, res) => {
     const allowedOrigins = ["http://localhost:5145", "http://localhost:5144"];
     const origin = req.headers.origin;
