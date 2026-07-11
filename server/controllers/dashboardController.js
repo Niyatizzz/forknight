@@ -1,16 +1,18 @@
 // controllers/dashboardController.js
 /**
  * Dashboard read endpoints.
- * All data is read from MongoDB — GitHub is NOT contacted here.
- * Run POST /api/github/sync first to refresh data.
+ *
+ * Architecture: sync on every login via POST /api/github/sync (called in the
+ * OAuth callback in server.js).  All dashboard GET endpoints read the freshly
+ * synced MongoDB data — GitHub is NOT re-contacted here except for
+ * weekly-activity, repos, and challenges which are inherently time-sensitive.
  */
 
-import User           from "../models/User.js";
-import Achievement    from "../models/Achievement.js";
-import XPTransaction  from "../models/XPTransaction.js";
-import { buildAchievementList, calculateLevel, calculateRank, xpToNextLevel } from "../services/progressionService.js";
-import { getWeeklyStats, getRecentEvents } from "../utils/githubApi.js";
-import { runSync } from "../services/syncService.js";
+import User          from "../models/User.js";
+import Achievement   from "../models/Achievement.js";
+import XPTransaction from "../models/XPTransaction.js";
+import { buildAchievementList, xpToNextLevel } from "../services/progressionService.js";
+import { getWeeklyStats } from "../utils/githubApi.js";
 
 // ── Helper: find user or 404 ──────────────────────────────────────────────────
 const findUser = async (githubId, res) => {
@@ -303,6 +305,7 @@ export const getProgress = async (req, res) => {
       totalIssues:  user.totalIssues,
       totalReviews: user.totalReviews,
       lastSync:     user.lastSync,
+      repoCount: user.totalRepos,
     });
   } catch (err) {
     console.error("getProgress error:", err.message);

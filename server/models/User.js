@@ -71,6 +71,10 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    totalRepos: {
+    type: Number,
+    default: 0,
+    },
 
     // ── Sync metadata ─────────────────────────────────────────────────
     lastContributionDate: {

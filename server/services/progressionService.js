@@ -1,16 +1,5 @@
 // services/progressionService.js
-/**
- * All game-progression logic lives here.
- * Controllers stay thin — they only call these functions.
- *
- * Exported functions:
- *   calculateLevel(xp)
- *   calculateRank(xp)
- *   calculateXP(stats)
- *   calculateAchievements(stats, alreadyUnlocked)
- *   calculateStreak(pushEvents)
- */
-
+import dayjs from "dayjs";
 import ACHIEVEMENT_RULES from "./achievementRules.js";
 
 // ── Level & Rank ─────────────────────────────────────────────────────────────
@@ -142,14 +131,14 @@ export const buildAchievementList = (unlockedDocs) => {
 
 /**
  * Calculates the current commit streak from an array of GitHub push events.
- * A streak is defined as consecutive calendar days that contain at least
- * one PushEvent.  The streak resets if there's a gap of more than 1 day.
+ * NOTE: This version uses the PUBLIC events REST API and therefore misses
+ * private-repo contributions.  It is kept only for the challenges controller
+ * which still uses raw event data.
  *
  * @param {object[]} events  GitHub /users/{login}/events response
  * @returns {number} current streak in days
  */
 export const calculateStreak = (events) => {
-  // Collect unique days that had a push
   const commitDaySet = new Set();
 
   for (const event of events) {
@@ -161,7 +150,6 @@ export const calculateStreak = (events) => {
 
   if (commitDaySet.size === 0) return 0;
 
-  // Sort dates descending (most recent first)
   const sortedDays = Array.from(commitDaySet)
     .map((d) => new Date(d))
     .sort((a, b) => b - a);
@@ -173,8 +161,6 @@ export const calculateStreak = (events) => {
   mostRecent.setHours(0, 0, 0, 0);
 
   const daysSinceLast = Math.floor((today - mostRecent) / 86_400_000);
-
-  // If the last commit was more than 1 day ago, streak is broken
   if (daysSinceLast > 1) return 0;
 
   let streak = 1;
@@ -183,12 +169,47 @@ export const calculateStreak = (events) => {
     const curr = new Date(sortedDays[i]);
     prev.setHours(0, 0, 0, 0);
     curr.setHours(0, 0, 0, 0);
-
     const gap = Math.floor((prev - curr) / 86_400_000);
-    if (gap === 1) {
+    if (gap === 1) streak++;
+    else break;
+  }
+
+  return streak;
+};
+
+/**
+ * Calculates the current contribution streak from the GitHub GraphQL
+ * contribution calendar.  This is the CORRECT streak function because:
+ *   - It includes private repository contributions
+ *   - It covers the full past year, not just the last ~90 public events
+ *   - It matches what GitHub itself shows on your profile
+ *
+ * @param {string[]} activeDays  Array of "YYYY-MM-DD" strings with contributions
+ *                               (from getContributionDays() in githubApi.js)
+ * @returns {number} current streak in days
+ */
+export const calculateStreakFromDays = (activeDays) => {
+  if (!activeDays || activeDays.length === 0) return 0;
+
+  // Sort descending (most recent first) — dates are already ISO strings so
+  // lexicographic sort works correctly for YYYY-MM-DD format
+  const sorted = [...activeDays].sort((a, b) => (a > b ? -1 : 1));
+
+  const today     = dayjs().format("YYYY-MM-DD");
+  const yesterday = dayjs().subtract(1, "day").format("YYYY-MM-DD");
+
+  // Streak is only active if the most recent contribution day is today or yesterday
+  const mostRecent = sorted[0];
+  if (mostRecent !== today && mostRecent !== yesterday) return 0;
+
+  // Count consecutive days walking backwards from the most recent
+  let streak = 1;
+  for (let i = 1; i < sorted.length; i++) {
+    const expected = dayjs(sorted[i - 1]).subtract(1, "day").format("YYYY-MM-DD");
+    if (sorted[i] === expected) {
       streak++;
     } else {
-      break; // gap found — streak ends here
+      break; // gap — streak ends here
     }
   }
 

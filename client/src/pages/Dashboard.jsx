@@ -43,8 +43,18 @@ const getRarityColor = (rarity) => {
   }
 };
 
+// Helper — format unlock date (used in AchievementCard)
+const formatUnlockDate = (dateStr) => {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+};
+
 const AchievementCard = ({ achievement }) => {
   if (!achievement) return null;
+  // API returns `title` and `rewardXP` — normalise here so the card is safe
+  const displayName = achievement.title || achievement.name || "Achievement";
+  const displayXP   = achievement.rewardXP ?? achievement.xp ?? 0;
   return (
     <div
       className={`relative overflow-hidden rounded-xl transition-all duration-300 hover:scale-105 ${
@@ -110,7 +120,7 @@ const AchievementCard = ({ achievement }) => {
               achievement.unlocked ? "text-white" : "text-purple-300"
             }`}
           >
-            {achievement.name}
+            {displayName}
           </h4>
           <p
             className={`text-lg mb-2 ${
@@ -125,7 +135,7 @@ const AchievementCard = ({ achievement }) => {
               achievement.unlocked ? "text-purple-100" : "text-purple-400"
             }`}
           >
-            {achievement.unlocked ? `${achievement.xp}xp` : "???"}
+            {achievement.unlocked ? `${displayXP}xp` : "???"}
           </h5>
 
           {/* Category */}
@@ -161,9 +171,9 @@ const AchievementCard = ({ achievement }) => {
           )}
 
           {/* XP Reward */}
-          {achievement.xpReward && (
+          {displayXP > 0 && (
             <div className="flex items-center justify-center gap-1 text-yellow-400 text-sm font-semibold">
-              <Zap className="w-4 h-4" />+{achievement.xpReward} XP
+              <Zap className="w-4 h-4" />+{displayXP} XP
             </div>
           )}
 
@@ -235,76 +245,81 @@ const Dashboard = () => {
     percentage,
   };
   const [totalXP, setTotalXP] = useState(0);
+  const [lastSync, setLastSync] = useState(null); // ISO string from MongoDB
 
   // ── Load dashboard data ───────────────────────────────────────────────────
   // Strategy:
   //   1. Hit /api/github/progress to see if we have a synced record in MongoDB.
   //   2. If not found (404), trigger /api/github/sync automatically (first login).
   //   3. Then load the rest of the data in parallel from MongoDB-backed endpoints.
-  useEffect(() => {
-    const load = async () => {
-      try {
-        // Step 1 — try reading persisted progress
-        let progress;
-        try {
-          progress = await apiGet("/api/github/progress");
-        } catch (e) {
-          if (e.message.includes("404")) {
-            // First login — kick off initial sync
-            const syncResult = await apiPost("/api/github/sync", {});
-            progress = syncResult.progress;
-          } else {
-            throw e;
-          }
-        }
+const loadDashboard = async () => {
+  try {
+    setLoading(true);
+    setError(null);
 
-        // Step 2 — load remaining data in parallel (all MongoDB-backed except
-        //           weekly-activity, challenges and repos which still call GitHub)
-        const [profile, weekly, ach, repoList, challengeList] =
-          await Promise.all([
-            apiGet("/api/github/profile"),
-            apiGet("/api/github/weekly-activity"),
-            apiGet("/api/github/achievements"),
-            apiGet("/api/github/repos"),
-            apiGet("/api/github/challenges"),
-          ]);
+    // Step 1 — Get progress from MongoDB
+    let progress;
 
-        // Step 3 — build user state from server-computed progress
-        setTotalXP(progress.xp);
+    try {
+      progress = await apiGet("/api/github/progress");
+    } catch (e) {
+      if (e.message.includes("404")) {
+        console.log("First login detected. Running initial sync...");
 
-        setUser({
-          name:         profile.name || profile.login,
-          level:        progress.level,
-          xp:           progress.xp,
-          xpToNext:     progress.xpToNext,
-          streak:       weekly.commits,     // weekly commit count for display
-          dayStreak:    progress.streak,    // persisted streak from MongoDB
-          totalCommits: progress.totalCommits,
-          totalPRs:     progress.totalPRs,
-          totalRepos:   progress.totalPRs !== undefined ? (repoList?.length ?? 0) : 0,
-          rank:         progress.rank,
-        });
-
-        setWeeklyStats(weekly);
-        setAchievements(ach.achievements);
-        setRepos(repoList);
-
-        if (challengeList?.challenges) {
-          setChallenges(challengeList.challenges);
-        } else {
-          setChallenges([]);
-        }
-
-        setLoading(false);
-      } catch (err) {
-        console.error("Failed to load dashboard data:", err);
-        setError(err.message);
-        setLoading(false);
+        const syncResult = await apiPost("/api/github/sync", {});
+        progress = syncResult.progress;
+      } else {
+        throw e;
       }
-    };
+    }
 
-    load();
-  }, []);
+    console.log("Progress:", progress);
+
+    // Step 2 — Load remaining dashboard data
+    const [profile, weekly, ach, repoList, challengeList] =
+      await Promise.all([
+        apiGet("/api/github/profile"),
+        apiGet("/api/github/weekly-activity"),
+        apiGet("/api/github/achievements"),
+        apiGet("/api/github/repos"),
+        apiGet("/api/github/challenges"),
+      ]);
+
+    // Step 3 — Update state
+    setTotalXP(progress.xp);
+    setLastSync(progress.lastSync || null);
+
+    setUser({
+      name:         profile.name || profile.login,
+      level:        progress.level,
+      xp:           progress.xp,
+      xpToNext:     progress.xpToNext,
+      streak:       weekly.commits,        // weekly commit count (used nowhere now)
+      dayStreak:    progress.streak,       // real consecutive-day streak from GraphQL calendar
+      totalCommits: progress.totalCommits,
+      totalPRs:     progress.totalPRs,
+      totalIssues:  progress.totalIssues,  // ← was missing; now included
+      totalRepos:   progress.repoCount ?? repoList.length,
+      rank:         progress.rank,
+    });
+
+    setWeeklyStats(weekly);
+    setAchievements(ach.achievements);
+    setRepos(repoList);
+    setChallenges(challengeList?.challenges || []);
+
+    setLoading(false);
+  } catch (err) {
+    console.error("Failed to load dashboard:", err);
+    setError(err.message);
+    setLoading(false);
+  }
+};
+
+useEffect(() => {
+  loadDashboard();
+}, []);
+
 
   // Updated challenge card component for better progress display
   const ChallengeCard = ({ challenge }) => {
@@ -492,7 +507,7 @@ const Dashboard = () => {
             <div className="w-full bg-purple-900/50 rounded-full h-2">
               <div
                 className="bg-gradient-to-r from-pink-500 to-purple-500 h-2 rounded-full"
-                style={{ width: `${((user.xp % 50) / 50) * 100}%` }}
+                style={{ width: `${((user.xp % 100) / 100) * 100}%` }}
               ></div>
             </div>
           </div>
@@ -522,10 +537,10 @@ const Dashboard = () => {
         <div className="p-4 border-t border-purple-500/20">
           <div className="grid grid-cols-2 gap-2 text-center">
             <div className="bg-purple-600/20 rounded-lg p-2">
-              <div className="text-lg font-bold text-green-400">
-                {user.streak}
+              <div className="text-lg font-bold text-orange-400">
+                {user.dayStreak}
               </div>
-              <div className="text-xs text-purple-300">Streak</div>
+              <div className="text-xs text-purple-300">Day Streak</div>
             </div>
             <div className="bg-purple-600/20 rounded-lg p-2">
               <div className="text-lg font-bold text-yellow-400">
@@ -591,6 +606,13 @@ const Dashboard = () => {
                       <span className="text-purple-300"> !</span>
                     </span>
                   </p>
+                  {/* Last Synced timestamp */}
+                  <p className="text-xs text-purple-400 mt-1 flex items-center justify-end gap-1">
+                    <span className={`inline-block w-2 h-2 rounded-full ${lastSync ? "bg-green-400" : "bg-yellow-400"}`}></span>
+                    {lastSync
+                      ? `Synced ${new Date(lastSync).toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}`
+                      : "Not yet synced"}
+                  </p>
                 </div>
               </div>
             </div>
@@ -629,13 +651,13 @@ const Dashboard = () => {
                   <div className="w-full bg-purple-900/50 rounded-full h-3">
                     <div
                       className="bg-gradient-to-r from-pink-500 to-purple-500 h-3 rounded-full transition-all duration-300"
-                      style={{ width: `${((user.xp % 50) / 50) * 100}%` }}
+                      style={{ width: `${((user.xp % 100) / 100) * 100}%` }}
                     ></div>
                   </div>
                 </div>
 
                 {/* Quick Stats */}
-                <div className="grid grid-cols-4 gap-4">
+                <div className="grid grid-cols-5 gap-4">
                   <div className="text-center">
                     <div className="text-2xl font-bold text-green-400">
                       {user.totalCommits}
@@ -647,6 +669,12 @@ const Dashboard = () => {
                       {user.totalPRs}
                     </div>
                     <div className="text-sm text-purple-300">Pull Requests</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-pink-400">
+                      {user.totalIssues}
+                    </div>
+                    <div className="text-sm text-purple-300">Issues</div>
                   </div>
                   <div className="text-center">
                     <div className="text-2xl font-bold text-yellow-400">
@@ -791,7 +819,7 @@ const Dashboard = () => {
                             {achievement.icon}
                           </div>
                           <div className="text-xs font-semibold">
-                            {achievement.name}
+                            {achievement.title || achievement.name}
                           </div>
                         </div>
                       ))}
@@ -876,7 +904,7 @@ const Dashboard = () => {
                     <div className="text-center">
                       <div className="text-6xl mb-4">{achievement.icon}</div>
                       <h3 className="text-xl font-bold mb-2">
-                        {achievement.name}
+                        {achievement.title || achievement.name}
                       </h3>
                       <p className="text-sm text-purple-300">
                         {achievement.description}

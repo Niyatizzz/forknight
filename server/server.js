@@ -1,3 +1,170 @@
+// import express from "express";
+// import cors from "cors";
+// import dotenv from "dotenv";
+// import session from "express-session";
+// import passport from "passport";
+// import GitHubStrategy from "passport-github2";
+// import githubRoutes from "./routes/github.js";
+
+// dotenv.config();
+
+// const app = express();
+// const PORT = process.env.PORT || 5000;
+
+// // CORS setup
+// const allowedOrigins = ["http://localhost:5144", "http://localhost:5145"];
+
+// app.use(
+//   cors({
+//     origin: function (origin, callback) {
+//       // allow requests with no origin (like curl or Postman) or if origin is allowed
+//       if (!origin || allowedOrigins.includes(origin)) {
+//         callback(null, true);
+//       } else {
+//         callback(new Error("Not allowed by CORS"));
+//       }
+//     },
+//     credentials: true,
+//     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+//   })
+// );
+
+// // Middleware
+// app.use(express.json());
+
+// // Session setup
+// app.use(
+//   session({
+//     secret: process.env.SESSION_SECRET,
+//     resave: false,
+//     saveUninitialized: false,
+//     cookie: {
+//       secure: true, // true only when you switch to HTTPS
+//       httpOnly: true,
+//       sameSite: "None", // or "none" + secure:true when you test over HTTPS
+//     },
+//   })
+// );
+
+// // Passport setup
+// app.use(passport.initialize());
+// app.use(passport.session());
+// app.use("/api/github", githubRoutes);
+
+// // GitHub Strategy
+// passport.use(
+//   new GitHubStrategy(
+//     {
+//       clientID: process.env.GITHUB_CLIENT_ID,
+//       clientSecret: process.env.GITHUB_CLIENT_SECRET,
+//       callbackURL: process.env.GITHUB_CALLBACK_URL,
+//     },
+//     function (accessToken, refreshToken, profile, done) {
+//       // Save accessToken on the user object
+//       profile.accessToken = accessToken;
+//       return done(null, profile);
+//     }
+//   )
+// );
+
+// // Serialize/Deserialize
+// passport.serializeUser((user, done) => {
+//   done(null, user);
+// });
+
+// passport.deserializeUser((obj, done) => {
+//   done(null, obj);
+// });
+
+// // Routes
+// app.get("/", (req, res) => {
+//   res.send("🌐 Forknight server is running!");
+// });
+
+// app.get(
+//   "/auth/github",
+//   passport.authenticate("github", { scope: ["user:email"] })
+// );
+
+// app.get(
+//   "/auth/github/callback",
+//   passport.authenticate("github", {
+//     failureRedirect: "/login",
+//   }),
+//   (req, res) => {
+//     const allowedOrigins = ["http://localhost:5145", "http://localhost:5144"];
+//     const origin = req.headers.origin;
+
+//     const redirectURL = allowedOrigins.includes(origin)
+//       ? `${origin}/dashboard`
+//       : "http://localhost:5144/dashboard"; // fallback default
+
+//     res.redirect(redirectURL);
+//   }
+// );
+
+// app.get("/api/github/data", async (req, res) => {
+//   if (!req.isAuthenticated()) {
+//     return res.status(401).json({ message: "Not authenticated" });
+//   }
+
+//   const accessToken = req.user.accessToken;
+
+//   try {
+//     const response = await fetch("https://api.github.com/user/repos", {
+//       headers: {
+//         Authorization: `token ${accessToken}`,
+//         Accept: "application/vnd.github.v3+json",
+//       },
+//     });
+
+//     const repos = await response.json();
+
+//     // You can also filter PRs, commits, etc. here
+//     res.json({ repos });
+//   } catch (err) {
+//     res
+//       .status(500)
+//       .json({ message: "Failed to fetch GitHub data", error: err });
+//   }
+// });
+
+// app.get("/api/user", (req, res) => {
+//   if (req.isAuthenticated()) {
+//     res.json(req.user);
+//   } else {
+//     res.status(401).json({ message: "Not authenticated" });
+//   }
+// });
+
+// app.get("/api/leaderboard", async (req, res) => {
+//   if (!req.isAuthenticated()) {
+//     return res.status(401).json({ message: "Not authenticated" });
+//   }
+
+//   // Placeholder logic – replace with real GitHub data processing
+//   res.json({
+//     leaderboard: [
+//       { username: "user1", score: 120 },
+//       { username: "user2", score: 100 },
+//     ],
+//   });
+// });
+
+// app.post("/api/auth/logout", (req, res, next) => {
+//   req.logout((err) => {
+//     if (err) return next(err);
+//     req.session.destroy(() => {
+//       res.clearCookie("connect.sid");
+//       return res.json({ success: true });
+//     });
+//   });
+// });
+
+// app.listen(PORT, () => {
+//   console.log(`🚀 Forknight server running at http://localhost:${PORT}`);
+// });
+
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
@@ -6,7 +173,7 @@ import passport from "passport";
 import GitHubStrategy from "passport-github2";
 import githubRoutes from "./routes/github.js";
 import connectDB from "./config/db.js";
-import autoSync from "./middleware/autoSync.js";
+import { runSync } from "./services/syncService.js";
 
 dotenv.config();
 
@@ -16,51 +183,46 @@ connectDB();
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// CORS setup
+// ✅ TRUST PROXY (REQUIRED FOR RENDER)
+//app.set("trust proxy", 1);
+
+// ✅ CORS (FIXED)
 const allowedOrigins = [
-  "http://localhost:5144",
-  "http://localhost:5145",
-  "https://forknight-ten.vercel.app",
+   "http://localhost:5173",
+   "http://localhost:5174",
+   "http://localhost:5144",
+  //"https://forknightt.netlify.app",
 ];
 
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // allow requests with no origin (like curl or Postman) or if origin is allowed
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
+    origin: allowedOrigins,
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  })
+  }),
 );
 
 // Middleware
 app.use(express.json());
 
-// Session setup
+// ✅ SESSION (FIXED)
 app.use(
   session({
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: true, // true only when you switch to HTTPS
+      secure: false, // required for HTTPS (Render)
       httpOnly: true,
-      sameSite: "None", // or "none" + secure:true when you test over HTTPS
+      sameSite: "lax", // must be lowercase for cross-site
     },
-  })
+  }),
 );
 
-// Passport setup
+// Passport
 app.use(passport.initialize());
 app.use(passport.session());
-app.use("/api/github", githubRoutes);
 
-// GitHub Strategy
+// ✅ GitHub Strategy
 passport.use(
   new GitHubStrategy(
     {
@@ -68,77 +230,93 @@ passport.use(
       clientSecret: process.env.GITHUB_CLIENT_SECRET,
       callbackURL: process.env.GITHUB_CALLBACK_URL,
     },
-    function (accessToken, refreshToken, profile, done) {
-      // Save accessToken on the user object
+    (accessToken, refreshToken, profile, done) => {
       profile.accessToken = accessToken;
       return done(null, profile);
-    }
-  )
+    },
+  ),
 );
 
-// Serialize/Deserialize
-passport.serializeUser((user, done) => {
-  done(null, user);
-});
-
-passport.deserializeUser((obj, done) => {
-  done(null, obj);
-});
+// Serialize
+passport.serializeUser((user, done) => done(null, user));
+passport.deserializeUser((obj, done) => done(null, obj));
 
 // Routes
 app.get("/", (req, res) => {
   res.send("🌐 Forknight server is running!");
 });
 
+// ✅ LOGIN ROUTE
 app.get(
   "/auth/github",
-  passport.authenticate("github", { scope: ["user:email"] })
-);
+  (req, res, next) => {
+    console.log("👉 HIT /auth/github");
+    console.log("CLIENT ID:", process.env.GITHUB_CLIENT_ID);
+    console.log("CALLBACK URL:", process.env.GITHUB_CALLBACK_URL);
 
-app.get(
-  "/auth/github/callback",
+    if (!process.env.GITHUB_CLIENT_ID) {
+      return res.send("❌ Missing GITHUB_CLIENT_ID");
+    }
+    if (!process.env.GITHUB_CALLBACK_URL) {
+      return res.send("❌ Missing GITHUB_CALLBACK_URL");
+    }
+
+    next();
+  },
   passport.authenticate("github", {
-    failureRedirect: "/login",
+    scope: ["user:email"],
+    callbackURL: process.env.GITHUB_CALLBACK_URL,
   }),
-  autoSync, // run initial sync for brand-new users (no-op for returning users)
-  (req, res) => {
-    const allowedOrigins = ["http://localhost:5145", "http://localhost:5144"];
-    const origin = req.headers.origin;
-
-    const redirectURL = allowedOrigins.includes(origin)
-      ? `${origin}/dashboard`
-      : "http://localhost:5144/dashboard"; // fallback default
-
-    res.redirect(redirectURL);
-  }
 );
 
-app.get("/api/github/data", async (req, res) => {
-  if (!req.isAuthenticated()) {
-    return res.status(401).json({ message: "Not authenticated" });
-  }
+// ✅ CALLBACK (FIXED REDIRECT)
+app.get("/auth/github/callback", (req, res, next) => {
+  console.log("👉 HIT /auth/github/callback");
+  console.log("CALLBACK URL:", process.env.GITHUB_CALLBACK_URL);
 
-  const accessToken = req.user.accessToken;
+  passport.authenticate(
+    "github",
+    {
+      //failureRedirect: "https://forknightt.netlify.app",
+      failureRedirect: "http://localhost:5144",
+      callbackURL: process.env.GITHUB_CALLBACK_URL,
+    },
+    (err, user, info) => {
+      if (err) {
+        console.error("GitHub callback error:", err);
+        return res.status(500).send(
+          `GitHub authentication failed: ${err.message || err}. callbackURL=${process.env.GITHUB_CALLBACK_URL}`,
+        );
+      }
+      if (!user) {
+        console.error("GitHub callback did not return a user:", info);
+        return res.status(500).send(
+          `GitHub callback did not return a user: ${JSON.stringify(info)}. callbackURL=${process.env.GITHUB_CALLBACK_URL}`,
+        );
+      }
+      req.logIn(user, async (loginErr) => {
+  if (loginErr) {
+    console.error("req.logIn error:", loginErr);
+    return res.status(500).send(
+      `Login failed: ${loginErr.message || loginErr}. callbackURL=${process.env.GITHUB_CALLBACK_URL}`,
+    );
+  }
 
   try {
-    const response = await fetch("https://api.github.com/user/repos", {
-      headers: {
-        Authorization: `token ${accessToken}`,
-        Accept: "application/vnd.github.v3+json",
-      },
-    });
-
-    const repos = await response.json();
-
-    // You can also filter PRs, commits, etc. here
-    res.json({ repos });
+    console.log("Starting GitHub sync...");
+    await runSync(req.user);
+    console.log("GitHub sync completed.");
   } catch (err) {
-    res
-      .status(500)
-      .json({ message: "Failed to fetch GitHub data", error: err });
+    console.error("Auto sync failed:", err);
   }
+
+  return res.redirect("http://localhost:5144/dashboard");
+});
+    },
+  )(req, res, next);
 });
 
+// ✅ USER CHECK
 app.get("/api/user", (req, res) => {
   if (req.isAuthenticated()) {
     res.json(req.user);
@@ -147,30 +325,39 @@ app.get("/api/user", (req, res) => {
   }
 });
 
-app.get("/api/leaderboard", async (req, res) => {
+// ✅ MOUNT GITHUB ROUTES
+app.use("/api/github", githubRoutes);
+
+// ✅ GITHUB DATA
+app.get("/api/github/data", async (req, res) => {
   if (!req.isAuthenticated()) {
     return res.status(401).json({ message: "Not authenticated" });
   }
 
-  // Placeholder logic – replace with real GitHub data processing
-  res.json({
-    leaderboard: [
-      { username: "user1", score: 120 },
-      { username: "user2", score: 100 },
-    ],
-  });
+  try {
+    const response = await fetch("https://api.github.com/user/repos", {
+      headers: {
+        Authorization: `token ${req.user.accessToken}`,
+      },
+    });
+
+    const repos = await response.json();
+    res.json({ repos });
+  } catch (err) {
+    res.status(500).json({ message: "GitHub fetch failed" });
+  }
 });
 
-app.post("/api/auth/logout", (req, res, next) => {
-  req.logout((err) => {
-    if (err) return next(err);
+// ✅ LOGOUT
+app.post("/api/auth/logout", (req, res) => {
+  req.logout(() => {
     req.session.destroy(() => {
       res.clearCookie("connect.sid");
-      return res.json({ success: true });
+      res.json({ success: true });
     });
   });
 });
 
 app.listen(PORT, () => {
-  console.log(`🚀 Forknight server running at http://localhost:${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });

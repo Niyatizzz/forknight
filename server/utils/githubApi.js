@@ -45,56 +45,123 @@ export const getProfile = async (token) => {
   };
 };
 
-/** Get total public repos of the user */
+/** Get total public repos owned by the user (GraphQL) */
 export const getRepoCount = async (token) => {
-  const { public_repos } = await callRest(token, "/user");
-  return public_repos;
-};
-
-/** Get total pull requests by user */
-export const getTotalPRs = async (token, login) => {
-  const { total_count } = await callRest(token, "/search/issues", {
-    q: `type:pr+author:${login}`,
-  });
-  return total_count;
-};
-
-/** Get total issues raised by user */
-export const getTotalIssues = async (token, login) => {
-  const { total_count } = await callRest(token, "/search/issues", {
-    q: `type:issue+author:${login}`,
-  });
-  return total_count;
-};
-
-/** Get total contributions (commits) using GraphQL */
-export const getTotalCommits = async (token) => {
   const query = `
     query {
       viewer {
-        contributionsCollection {
-          contributionCalendar {
-            totalContributions
-          }
+        repositories(ownerAffiliations: OWNER) {
+          totalCount
         }
       }
     }
   `;
   const data = await callGraphQL(token, query);
-  return data.viewer.contributionsCollection.contributionCalendar
-    .totalContributions;
+  return data.viewer.repositories.totalCount;
+};
+
+/** Get total pull requests opened by the user (GraphQL) */
+export const getTotalPRs = async (token) => {
+  const query = `
+    query {
+      viewer {
+        pullRequests {
+          totalCount
+        }
+      }
+    }
+  `;
+  const data = await callGraphQL(token, query);
+  return data.viewer.pullRequests.totalCount;
+};
+
+/** Get total issues raised by the user (GraphQL) */
+export const getTotalIssues = async (token) => {
+  const query = `
+    query {
+      viewer {
+        issues {
+          totalCount
+        }
+      }
+    }
+  `;
+  const data = await callGraphQL(token, query);
+  return data.viewer.issues.totalCount;
+};
+
+/** Get total contributions (commits) from the contribution calendar (GraphQL) */
+export const getTotalCommits = async (token) => {
+  const query = `
+    query {
+      viewer {
+        contributionsCollection {
+          totalCommitContributions
+        }
+      }
+    }
+  `;
+  const data = await callGraphQL(token, query);
+  return data.viewer.contributionsCollection.totalCommitContributions;
 };
 
 /**
  * Fetch the most recent public events for a user (up to 100).
- * Used for streak calculation.
+ * Kept for challenges controller which still uses event data.
  */
 export const getRecentEvents = async (token, login) => {
   const data = await callRest(token, `/users/${login}/events`, { per_page: 100 });
   return Array.isArray(data) ? data : [];
 };
 
-/** Get total stats for past 7 days */
+/**
+ * Fetch the full contribution calendar for the past year using GraphQL.
+ * Includes PRIVATE repo contributions — this is the correct source for streak
+ * calculation.  Returns an array of date strings ("YYYY-MM-DD") that had at
+ * least 1 contribution.
+ *
+ * @param {string} token  GitHub OAuth access token
+ * @returns {string[]}    Array of ISO date strings with contributions
+ */
+export const getContributionDays = async (token) => {
+  // Request the last 365 days so we can calculate any realistic streak
+  const to   = dayjs().endOf("day").toISOString();
+  const from = dayjs().subtract(365, "day").startOf("day").toISOString();
+
+  const query = `
+    query($from: DateTime!, $to: DateTime!) {
+      viewer {
+        contributionsCollection(from: $from, to: $to) {
+          contributionCalendar {
+            weeks {
+              contributionDays {
+                date
+                contributionCount
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const data = await callGraphQL(token, query, { from, to });
+  const weeks = data.viewer.contributionsCollection.contributionCalendar.weeks;
+
+  // Flatten all days and keep only those with at least 1 contribution
+  const activeDays = [];
+  for (const week of weeks) {
+    for (const day of week.contributionDays) {
+      if (day.contributionCount > 0) {
+        activeDays.push(day.date); // "YYYY-MM-DD"
+      }
+    }
+  }
+
+  return activeDays;
+};
+
+/** Get contribution stats for the past 7 days (GraphQL) */
 export const getWeeklyStats = async (token) => {
   const to = dayjs().endOf("day").toISOString();
   const from = dayjs().subtract(7, "day").startOf("day").toISOString();
@@ -114,9 +181,9 @@ export const getWeeklyStats = async (token) => {
   const data = await callGraphQL(token, query, { from, to });
   const c = data.viewer.contributionsCollection;
   return {
-    commits: c.totalCommitContributions,
-    prs: c.totalPullRequestContributions,
-    reviews: c.totalPullRequestReviewContributions,
-    issues: c.totalIssueContributions,
+    commits:  c.totalCommitContributions,
+    prs:      c.totalPullRequestContributions,
+    reviews:  c.totalPullRequestReviewContributions,
+    issues:   c.totalIssueContributions,
   };
 };

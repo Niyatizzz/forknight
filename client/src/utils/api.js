@@ -1,5 +1,6 @@
 // src/utils/api.js
-const BASE = import.meta.env.VITE_API_BASE || "http://localhost:5000";
+// Strip any trailing slash from the base URL to avoid double-slash paths
+const BASE = (import.meta.env.VITE_API_BASE_URL || "https://forknight-server.onrender.com").replace(/\/$/, "");
 
 export const apiGet = async (path) => {
   const res = await fetch(`${BASE}${path}`, {
@@ -12,7 +13,7 @@ export const apiGet = async (path) => {
 export const apiPost = async (path, body = {}) => {
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
-    credentials: "include", // keep this for session-based auth
+    credentials: "include",
     headers: {
       "Content-Type": "application/json",
     },

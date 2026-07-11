@@ -20,7 +20,7 @@ import {
   getTotalIssues,
   getTotalCommits,
   getWeeklyStats,
-  getRecentEvents,
+  getContributionDays,
 } from "../utils/githubApi.js";
 
 import {
@@ -28,7 +28,7 @@ import {
   calculateXP,
   calculateLevel,
   calculateRank,
-  calculateStreak,
+  calculateStreakFromDays,
   calculateAchievements,
   xpToNextLevel,
 } from "./progressionService.js";
@@ -48,19 +48,22 @@ export const runSync = async (sessionUser) => {
   const githubId = String(sessionUser.id);
 
   // ── 1. Fetch GitHub data in parallel ──────────────────────────────────────
-  const [profile, repoCount, totalPRs, totalIssues, totalCommits, weeklyStats, recentEvents] =
+  const [profile, repoCount, totalPRs, totalIssues, totalCommits, weeklyStats, contributionDays] =
     await Promise.all([
       getProfile(accessToken),
       getRepoCount(accessToken),
-      getTotalPRs(accessToken, login),
-      getTotalIssues(accessToken, login),
+      getTotalPRs(accessToken),
+      getTotalIssues(accessToken),
       getTotalCommits(accessToken),
       getWeeklyStats(accessToken),
-      getRecentEvents(accessToken, login),
+      getContributionDays(accessToken),  // GraphQL calendar — includes private repos
     ]);
 
-  // ── 2. Streak ──────────────────────────────────────────────────────────────
-  const currentStreak = calculateStreak(recentEvents);
+  console.log("✅ GitHub data fetched:", { totalCommits, repoCount, totalPRs, totalIssues });
+
+  // ── 2. Streak (GraphQL calendar — counts private + public contributions) ───
+  const currentStreak = calculateStreakFromDays(contributionDays);
+  console.log(`🔥 Streak: ${currentStreak} days (from ${contributionDays.length} active days)`);
 
   // ── 3. Build stats object used by achievement engine ──────────────────────
   const stats = {
@@ -75,8 +78,11 @@ export const runSync = async (sessionUser) => {
     weeklyReviews: weeklyStats.reviews,
   };
 
+  console.log(`🔍 Syncing GitHub ID: ${githubId}`);
+  const existing = await User.findOne({ githubId });
+  let user = existing;
   // ── 4. Find or create the User document ───────────────────────────────────
-  let user = await User.findOne({ githubId });
+  //let user = await User.findOne({ githubId });
 
   if (!user) {
     user = new User({
@@ -90,6 +96,10 @@ export const runSync = async (sessionUser) => {
   } else {
     // Always keep the token fresh
     user.accessToken = accessToken;
+    user.username = login;
+    user.displayName = profile.name || login;
+    user.avatar = profile.avatarUrl;
+    user.email = profile.email || "";
   }
 
   // ── 5. Determine already-unlocked achievements ────────────────────────────
@@ -143,22 +153,32 @@ export const runSync = async (sessionUser) => {
   const finalRank  = calculateRank(finalXP);
   const nextXP     = xpToNextLevel(finalXP);
 
-  // ── 10. Update user document ───────────────────────────────────────────────
-  user.totalXP           = finalXP;
-  user.currentLevel      = finalLevel;
-  user.currentRank       = finalRank;
-  user.currentStreak     = currentStreak;
-  user.longestStreak     = Math.max(user.longestStreak || 0, currentStreak);
-  user.totalCommits      = totalCommits;
-  user.totalPullRequests = totalPRs;
-  user.totalIssues       = totalIssues;
-  user.totalReviews      = weeklyStats.reviews;
-  user.lastSync          = now;
-  user.displayName       = profile.name || login;
-  user.avatar            = profile.avatarUrl;
 
-  await user.save();
+  user = await User.findOneAndUpdate(
+    { githubId },
+    {
+      githubId,
+      username:          login,
+      displayName:       profile.name || login,
+      avatar:            profile.avatarUrl,
+      email:             profile.email || "",
+      accessToken,
+      totalXP:           finalXP,
+      currentLevel:      finalLevel,
+      currentRank:       finalRank,
+      currentStreak,
+      longestStreak:     Math.max(user.longestStreak || 0, currentStreak),
+      totalCommits,
+      totalPullRequests: totalPRs,
+      totalIssues,
+      totalReviews:      weeklyStats.reviews,
+      totalRepos:        repoCount,
+      lastSync:          now,
+    },
+    { upsert: true, new: true }
+  );
 
+  console.log(`✅ Sync complete for ${login} — XP: ${finalXP}, Level: ${finalLevel}, Rank: ${finalRank}, Streak: ${currentStreak}`);
   // ── 11. Build response ─────────────────────────────────────────────────────
   return {
     profile: {

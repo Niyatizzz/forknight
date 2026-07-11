@@ -15,26 +15,17 @@ import User       from "../models/User.js";
 import { runSync } from "../services/syncService.js";
 
 const autoSync = async (req, res, next) => {
-  // Only run if Passport has authenticated the user
   if (!req.isAuthenticated()) return next();
 
   try {
-    const githubId = String(req.user.id);
-    const existing = await User.findOne({ githubId });
-
-    if (!existing) {
-      // New user — run initial sync silently
-      console.log(`🆕 New user ${req.user.username} — running initial sync…`);
-      await runSync(req.user);
-      console.log(`✅ Initial sync complete for ${req.user.username}`);
-    }
-    // Existing user — skip sync, let them trigger it manually
+    console.log(`Syncing ${req.user.username}...`);
+    await runSync(req.user);
+    console.log("Sync complete.");
   } catch (err) {
-    // Never block the login flow on a sync error
-    console.error("Auto-sync error (non-fatal):", err.message);
+    console.error(err);
   }
 
-  return next();
+  next();
 };
 
 export default autoSync;
