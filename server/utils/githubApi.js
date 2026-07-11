@@ -115,6 +115,41 @@ export const getRecentEvents = async (token, login) => {
 };
 
 /**
+ * Fetch the full contribution calendar for the graph — returns the complete
+ * weeks/days structure with contribution counts for every day.
+ * Used to render the heatmap on the dashboard.
+ *
+ * @param {string} token
+ * @returns {{ totalContributions: number, weeks: Array<{ contributionDays: Array<{ date, contributionCount, weekday }> }> }}
+ */
+export const getContributionGraph = async (token) => {
+  const to   = dayjs().endOf("day").toISOString();
+  const from = dayjs().subtract(365, "day").startOf("day").toISOString();
+
+  const query = `
+    query($from: DateTime!, $to: DateTime!) {
+      viewer {
+        contributionsCollection(from: $from, to: $to) {
+          contributionCalendar {
+            totalContributions
+            weeks {
+              contributionDays {
+                date
+                contributionCount
+                weekday
+              }
+            }
+          }
+        }
+      }
+    }
+  `;
+
+  const data = await callGraphQL(token, query, { from, to });
+  return data.viewer.contributionsCollection.contributionCalendar;
+};
+
+/**
  * Fetch the full contribution calendar for the past year using GraphQL.
  * Includes PRIVATE repo contributions — this is the correct source for streak
  * calculation.  Returns an array of date strings ("YYYY-MM-DD") that had at

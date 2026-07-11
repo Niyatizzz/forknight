@@ -12,7 +12,7 @@ import User          from "../models/User.js";
 import Achievement   from "../models/Achievement.js";
 import XPTransaction from "../models/XPTransaction.js";
 import { buildAchievementList, xpToNextLevel } from "../services/progressionService.js";
-import { getWeeklyStats } from "../utils/githubApi.js";
+import { getWeeklyStats, getContributionGraph } from "../utils/githubApi.js";
 
 // ── Helper: find user or 404 ──────────────────────────────────────────────────
 const findUser = async (githubId, res) => {
@@ -310,6 +310,19 @@ export const getProgress = async (req, res) => {
   } catch (err) {
     console.error("getProgress error:", err.message);
     return res.status(500).json({ message: "Failed to read progress" });
+  }
+};
+
+// ── GET /api/github/contribution-graph ───────────────────────────────────────
+// Returns the full year contribution calendar for the heatmap graph.
+// Always fetched live from GitHub — this is display data, not progression data.
+export const getContributionGraphData = async (req, res) => {
+  try {
+    const data = await getContributionGraph(req.user.accessToken);
+    return res.json(data);
+  } catch (err) {
+    console.error("getContributionGraphData error:", err.message);
+    return res.status(500).json({ message: "Failed to fetch contribution graph" });
   }
 };
 

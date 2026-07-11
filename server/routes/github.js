@@ -10,6 +10,7 @@ import {
   getChallenges,
   getProgress,
   getXPHistory,
+  getContributionGraphData,
 }                            from "../controllers/dashboardController.js";
 
 const router = express.Router();
@@ -33,8 +34,9 @@ router.get("/weekly-activity", getWeeklyActivity);
 router.get("/achievements",    getAchievements);
 router.get("/repos",           getRepos);
 router.get("/challenges",      getChallenges);
-router.get("/progress",        getProgress);
-router.get("/xp-history",      getXPHistory);
+router.get("/progress",              getProgress);
+router.get("/xp-history",            getXPHistory);
+router.get("/contribution-graph",    getContributionGraphData);
 
 // ── Leaderboard (placeholder) ─────────────────────────────────────────────────
 router.get("/leaderboard", (_req, res) => {

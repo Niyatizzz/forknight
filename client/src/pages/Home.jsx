@@ -1,14 +1,61 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   Github, Zap, Trophy, Users, ArrowRight, Star,
   GitBranch, Code, Award, Flame, GitPullRequest,
   Shield, TrendingUp, CheckCircle,
 } from "lucide-react";
 
+/* ── Scroll-reveal hook ─────────────────────────────────────────── */
+const useReveal = (threshold = 0.15) => {
+  const ref = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setVisible(true); obs.disconnect(); } },
+      { threshold }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [threshold]);
+  return [ref, visible];
+};
+
+/* ── Animated counter ──────────────────────────────────────────── */
+const AnimatedCounter = ({ target, suffix = "", duration = 1200 }) => {
+  const [count, setCount] = useState(0);
+  const [ref, visible] = useReveal(0.3);
+  useEffect(() => {
+    if (!visible) return;
+    let start = 0;
+    const step = target / (duration / 16);
+    const t = setInterval(() => {
+      start += step;
+      if (start >= target) { setCount(target); clearInterval(t); }
+      else setCount(Math.floor(start));
+    }, 16);
+    return () => clearInterval(t);
+  }, [visible, target, duration]);
+  return <span ref={ref}>{count.toLocaleString()}{suffix}</span>;
+};
+
 /* ─────────────────────────────────────────────
    Tiny reusable components
 ───────────────────────────────────────────── */
+/* ── Scroll-reveal wrapper ──────────────────────────────────────── */
+const Reveal = ({ children, delay = "0ms", className = "" }) => {
+  const [ref, visible] = useReveal();
+  return (
+    <div
+      ref={ref}
+      className={`transition-all duration-700 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"} ${className}`}
+      style={{ transitionDelay: delay }}
+    >
+      {children}
+    </div>
+  );
+};
 const Badge = ({ children }) => (
   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-purple-500/15 border border-purple-500/30 text-purple-300">
     {children}
@@ -22,35 +69,47 @@ const GradientText = ({ children, from = "from-purple-400", to = "to-pink-400" }
 );
 
 /* Stat counter card */
-const StatCard = ({ icon: Icon, value, label, color, delay }) => (
-  <div
-    className="flex flex-col items-center gap-2 p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm hover:border-purple-500/40 transition-all duration-300"
-    style={{ animationDelay: delay }}
-  >
-    <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br ${color}`}>
-      <Icon className="w-6 h-6 text-white" />
+const StatCard = ({ icon: Icon, value, numericValue, suffix = "+", label, color, delay }) => {
+  const [ref, visible] = useReveal(0.2);
+  return (
+    <div
+      ref={ref}
+      className={`flex flex-col items-center gap-2 p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-sm hover:border-purple-500/40 hover:scale-[1.02] transition-all duration-300 ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+      style={{ transitionDelay: delay, transitionDuration: "600ms" }}
+    >
+      <div className={`w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br ${color}`}>
+        <Icon className="w-6 h-6 text-white" />
+      </div>
+      <p className="text-3xl font-bold text-white">
+        {visible && numericValue != null
+          ? <><AnimatedCounter target={numericValue} suffix={suffix} /></>
+          : value}
+      </p>
+      <p className="text-sm text-slate-400">{label}</p>
     </div>
-    <p className="text-3xl font-bold text-white">{value}</p>
-    <p className="text-sm text-slate-400">{label}</p>
-  </div>
-);
+  );
+};
 
 /* Feature card */
-const FeatureCard = ({ icon: Icon, title, desc, gradient, delay }) => (
-  <div
-    className="group relative p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-purple-500/50 hover:bg-white/8 transition-all duration-300 overflow-hidden"
-    style={{ animationDelay: delay }}
-  >
-    <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br ${gradient} rounded-2xl`} />
-    <div className="relative z-10">
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center bg-gradient-to-br ${gradient} mb-4 group-hover:scale-110 transition-transform duration-200`}>
-        <Icon className="w-5 h-5 text-white" />
+const FeatureCard = ({ icon: Icon, title, desc, gradient, delay }) => {
+  const [ref, visible] = useReveal(0.1);
+  return (
+    <div
+      ref={ref}
+      className={`group relative p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-purple-500/50 hover:bg-white/8 transition-all duration-300 overflow-hidden ${visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"}`}
+      style={{ transitionDelay: delay, transitionDuration: "600ms" }}
+    >
+      <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-br ${gradient} rounded-2xl`} />
+      <div className="relative z-10">
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center bg-gradient-to-br ${gradient} mb-4 group-hover:scale-110 transition-transform duration-200`}>
+          <Icon className="w-5 h-5 text-white" />
+        </div>
+        <h3 className="text-lg font-bold text-white mb-2">{title}</h3>
+        <p className="text-sm text-slate-400 leading-relaxed">{desc}</p>
       </div>
-      <h3 className="text-lg font-bold text-white mb-2">{title}</h3>
-      <p className="text-sm text-slate-400 leading-relaxed">{desc}</p>
     </div>
-  </div>
-);
+  );
+};
 
 /* Step card for "How it works" */
 const StepCard = ({ number, title, desc, accent, items }) => (
@@ -78,24 +137,37 @@ const StepCard = ({ number, title, desc, accent, items }) => (
 );
 
 /* XP action pill */
-const XPPill = ({ emoji, action, xp, color }) => (
-  <div className="flex items-center justify-between px-4 py-3 rounded-xl bg-white/5 border border-white/10 hover:border-purple-400/40 transition-colors">
-    <div className="flex items-center gap-3">
-      <span className="text-xl">{emoji}</span>
-      <span className="text-sm font-medium text-white">{action}</span>
+const XPPill = ({ emoji, action, xp, color, delay = "0ms" }) => {
+  const [ref, visible] = useReveal(0.1);
+  return (
+    <div
+      ref={ref}
+      className={`flex items-center justify-between px-4 py-3 rounded-xl bg-white/5 border border-white/10 hover:border-purple-400/40 hover:scale-[1.02] transition-all duration-300 ${visible ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4"}`}
+      style={{ transitionDelay: delay, transitionDuration: "500ms" }}
+    >
+      <div className="flex items-center gap-3">
+        <span className="text-xl">{emoji}</span>
+        <span className="text-sm font-medium text-white">{action}</span>
+      </div>
+      <span className={`text-sm font-bold ${color}`}>+{xp} XP</span>
     </div>
-    <span className={`text-sm font-bold ${color}`}>+{xp} XP</span>
-  </div>
-);
+  );
+};
 
 /* ─────────────────────────────────────────────
    Mock Dashboard Preview widget
 ───────────────────────────────────────────── */
-const DashboardPreview = () => (
+const DashboardPreview = () => {
+  const [hovered, setHovered] = useState(false);
+  return (
   <div className="relative w-full max-w-sm mx-auto">
     {/* Glow behind the card */}
-    <div className="absolute -inset-4 bg-gradient-to-br from-purple-600/30 to-pink-600/20 rounded-3xl blur-2xl" />
-    <div className="relative rounded-2xl border border-white/15 bg-slate-900/80 backdrop-blur-xl overflow-hidden shadow-2xl">
+    <div className={`absolute -inset-4 bg-gradient-to-br from-purple-600/30 to-pink-600/20 rounded-3xl blur-2xl transition-opacity duration-500 ${hovered ? "opacity-100" : "opacity-60"}`} />
+    <div
+      className="relative rounded-2xl border border-white/15 bg-slate-900/80 backdrop-blur-xl overflow-hidden shadow-2xl transition-transform duration-300 hover:scale-[1.02] cursor-default"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       {/* Header bar */}
       <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10 bg-white/5">
         <div className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
@@ -107,13 +179,13 @@ const DashboardPreview = () => (
       <div className="p-5 space-y-4">
         {/* User row */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-sm font-bold text-white">N</div>
+          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-sm font-bold text-white shrink-0">N</div>
           <div>
             <p className="text-sm font-semibold text-white">nihitakolukula</p>
             <p className="text-xs text-purple-400">Level 14 · Pro Hacker</p>
           </div>
           <div className="ml-auto text-right">
-            <p className="text-lg font-bold text-yellow-400">1,340 XP</p>
+            <p className={`text-lg font-bold text-yellow-400 transition-all duration-300 ${hovered ? "scale-110" : "scale-100"}`}>1,340 XP</p>
           </div>
         </div>
         {/* XP bar */}
@@ -121,42 +193,73 @@ const DashboardPreview = () => (
           <div className="flex justify-between text-xs text-slate-500 mb-1">
             <span>Progress to Level 15</span><span>60 XP to go</span>
           </div>
-          <div className="w-full bg-white/10 rounded-full h-2">
-            <div className="h-2 rounded-full bg-gradient-to-r from-purple-500 to-pink-500" style={{ width: "40%" }} />
+          <div className="w-full bg-white/10 rounded-full h-2 overflow-hidden">
+            <div
+              className="h-2 rounded-full transition-all duration-700"
+              style={{
+                width: hovered ? "45%" : "40%",
+                background: "linear-gradient(90deg,#a855f7,#ec4899,#f59e0b,#ec4899,#a855f7)",
+                backgroundSize: "200% auto",
+                animation: "shimmer 2.5s linear infinite",
+              }}
+            />
           </div>
         </div>
         {/* Stats row */}
         <div className="grid grid-cols-4 gap-2 text-center">
-          {[["222", "Commits"], ["18", "PRs"], ["7🔥", "Streak"], ["31", "Repos"]].map(([v, l]) => (
-            <div key={l} className="bg-white/5 rounded-lg py-2">
+          {[["222","Commits"],["18","PRs"],["7🔥","Streak"],["31","Repos"]].map(([v, l]) => (
+            <div key={l} className={`bg-white/5 rounded-lg py-2 transition-all duration-200 ${hovered ? "bg-white/10 scale-105" : ""}`}>
               <p className="text-sm font-bold text-white">{v}</p>
               <p className="text-xs text-slate-500">{l}</p>
             </div>
           ))}
         </div>
-        {/* Achievement row */}
+        {/* Badge row */}
         <div>
           <p className="text-xs text-slate-500 mb-2 font-medium uppercase tracking-wide">Recent Badges</p>
           <div className="flex gap-2">
-            {["🩸", "🥷", "🔀", "🔥", "💪"].map((icon, i) => (
-              <div key={i} className="w-9 h-9 rounded-lg bg-gradient-to-br from-yellow-500/30 to-orange-500/30 border border-yellow-500/20 flex items-center justify-center text-base">{icon}</div>
+            {["🩸","🥷","🔀","🔥","💪"].map((icon, i) => (
+              <div
+                key={i}
+                className="w-9 h-9 rounded-lg bg-gradient-to-br from-yellow-500/30 to-orange-500/30 border border-yellow-500/20 flex items-center justify-center text-base transition-all duration-200"
+                style={{
+                  transform: hovered ? `translateY(${-4 - i * 1.5}px) scale(1.1)` : "none",
+                  transitionDelay: `${i * 50}ms`,
+                }}
+              >
+                {icon}
+              </div>
             ))}
           </div>
         </div>
       </div>
     </div>
   </div>
-);
+  );
+};
 
 /* ─────────────────────────────────────────────
    Main component
 ───────────────────────────────────────────── */
 const Home = () => {
-  const navigate = useNavigate();
   const [typedText, setTypedText] = useState("");
-  const [wordIdx, setWordIdx] = useState(0);
-  const [deleting, setDeleting] = useState(false);
+  const [wordIdx, setWordIdx]     = useState(0);
+  const [deleting, setDeleting]   = useState(false);
   const words = ["Commits", "Pull Requests", "Issues", "Code Reviews", "Streaks"];
+
+  /* Inject shimmer keyframe used by DashboardPreview */
+  useEffect(() => {
+    if (document.getElementById("fk-home-styles")) return;
+    const tag = document.createElement("style");
+    tag.id = "fk-home-styles";
+    tag.textContent = `
+      @keyframes shimmer {
+        0%   { background-position: -200% center; }
+        100% { background-position:  200% center; }
+      }
+    `;
+    document.head.appendChild(tag);
+  }, []);
 
   const handleConnect = () => {
     const base = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
@@ -293,23 +396,25 @@ const Home = () => {
 
         {/* Stats bar */}
         <div className="grid grid-cols-3 gap-4 mt-20">
-          <StatCard icon={Code}  value="10K+"  label="Commits gamified"  color="from-blue-500 to-purple-500"  delay="0s" />
-          <StatCard icon={Users} value="500+"  label="Active players"    color="from-purple-500 to-pink-500"  delay="0.1s" />
-          <StatCard icon={Award} value="50+"   label="Unique badges"     color="from-pink-500 to-red-500"     delay="0.2s" />
+          <StatCard icon={Code}  value="10K+"  numericValue={10000} suffix="+"  label="Commits gamified"  color="from-blue-500 to-purple-500"  delay="0ms" />
+          <StatCard icon={Users} value="500+"  numericValue={500}   suffix="+"  label="Active players"    color="from-purple-500 to-pink-500"  delay="100ms" />
+          <StatCard icon={Award} value="50+"   numericValue={50}    suffix="+"  label="Unique badges"     color="from-pink-500 to-red-500"     delay="200ms" />
         </div>
       </section>
 
       {/* ── Features ───────────────────────────────── */}
       <section id="features" className="relative z-10 max-w-7xl mx-auto px-6 py-24">
         <div className="text-center mb-14">
-          <Badge><Star className="w-3 h-3" /> Features</Badge>
-          <h2 className="text-4xl font-extrabold mt-4 mb-4">
-            Everything you need to{" "}
-            <GradientText>level up</GradientText>
-          </h2>
-          <p className="text-slate-400 max-w-xl mx-auto">
-            ForkNight hooks into the GitHub APIs you already use and turns the numbers into a game.
-          </p>
+          <Reveal>
+            <Badge><Star className="w-3 h-3" /> Features</Badge>
+            <h2 className="text-4xl font-extrabold mt-4 mb-4">
+              Everything you need to{" "}
+              <GradientText>level up</GradientText>
+            </h2>
+            <p className="text-slate-400 max-w-xl mx-auto">
+              ForkNight hooks into the GitHub APIs you already use and turns the numbers into a game.
+            </p>
+          </Reveal>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {features.map((f) => (
@@ -324,101 +429,115 @@ const Home = () => {
 
           {/* Steps */}
           <div>
-            <Badge><TrendingUp className="w-3 h-3" /> How it works</Badge>
-            <h2 className="text-4xl font-extrabold mt-4 mb-10">
-              Up and running in{" "}
-              <GradientText>three steps</GradientText>
-            </h2>
-            <StepCard
-              number={1}
-              title="Connect GitHub"
-              desc="One click OAuth. We request read-only access to your profile and contributions — we never write anything."
-              accent="from-purple-500 to-pink-500"
-              items={[{ label: "OAuth 2.0", color: "text-purple-400" }, { label: "Read-only", color: "text-green-400" }]}
-            />
-            <StepCard
-              number={2}
-              title="We sync your data"
-              desc="We fetch your commit calendar, PRs, issues and reviews from GitHub's GraphQL API — including private repos."
-              accent="from-blue-500 to-purple-500"
-              items={[{ label: "GraphQL API", color: "text-blue-400" }, { label: "Private repos", color: "text-yellow-400" }]}
-            />
-            <StepCard
-              number={3}
-              title="Watch the game unfold"
-              desc="XP, levels, streaks and badges update every login. New achievements unlock automatically as you hit milestones."
-              accent="from-pink-500 to-orange-500"
-              items={[{ label: "Auto-achievements", color: "text-pink-400" }, { label: "Persistent XP", color: "text-orange-400" }]}
-            />
+            <Reveal>
+              <Badge><TrendingUp className="w-3 h-3" /> How it works</Badge>
+              <h2 className="text-4xl font-extrabold mt-4 mb-10">
+                Up and running in{" "}
+                <GradientText>three steps</GradientText>
+              </h2>
+            </Reveal>
+            <Reveal delay="100ms">
+              <StepCard
+                number={1}
+                title="Connect GitHub"
+                desc="One click OAuth. We request read-only access to your profile and contributions — we never write anything."
+                accent="from-purple-500 to-pink-500"
+                items={[{ label: "OAuth 2.0", color: "text-purple-400" }, { label: "Read-only", color: "text-green-400" }]}
+              />
+            </Reveal>
+            <Reveal delay="200ms">
+              <StepCard
+                number={2}
+                title="We sync your data"
+                desc="We fetch your commit calendar, PRs, issues and reviews from GitHub's GraphQL API — including private repos."
+                accent="from-blue-500 to-purple-500"
+                items={[{ label: "GraphQL API", color: "text-blue-400" }, { label: "Private repos", color: "text-yellow-400" }]}
+              />
+            </Reveal>
+            <Reveal delay="300ms">
+              <StepCard
+                number={3}
+                title="Watch the game unfold"
+                desc="XP, levels, streaks and badges update every login. New achievements unlock automatically as you hit milestones."
+                accent="from-pink-500 to-orange-500"
+                items={[{ label: "Auto-achievements", color: "text-pink-400" }, { label: "Persistent XP", color: "text-orange-400" }]}
+              />
+            </Reveal>
           </div>
 
           {/* XP actions */}
           <div id="rewards">
-            <Badge><Zap className="w-3 h-3" /> XP Rewards</Badge>
-            <h2 className="text-3xl font-extrabold mt-4 mb-2">
-              Every action <GradientText>earns XP</GradientText>
-            </h2>
-            <p className="text-slate-400 text-sm mb-8">
-              XP is calculated from your lifetime stats on GitHub — more contributions = more XP, always.
-            </p>
+            <Reveal>
+              <Badge><Zap className="w-3 h-3" /> XP Rewards</Badge>
+              <h2 className="text-3xl font-extrabold mt-4 mb-2">
+                Every action <GradientText>earns XP</GradientText>
+              </h2>
+              <p className="text-slate-400 text-sm mb-8">
+                XP is calculated from your lifetime stats on GitHub — more contributions = more XP, always.
+              </p>
+            </Reveal>
             <div className="space-y-3 mb-8">
-              {xpActions.map((a) => <XPPill key={a.action} {...a} />)}
+              {xpActions.map((a, i) => <XPPill key={a.action} {...a} delay={`${i * 80}ms`} />)}
             </div>
 
             {/* Rank ladder */}
-            <div className="p-5 rounded-2xl bg-white/5 border border-white/10">
-              <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-4">Rank ladder</p>
-              <div className="space-y-2">
-                {[
-                  ["Newbie", "0 XP", "text-slate-400"],
-                  ["Rookie Committer", "50 XP", "text-green-400"],
-                  ["Code Explorer", "150 XP", "text-blue-400"],
-                  ["Skilled Dev", "300 XP", "text-purple-400"],
-                  ["Pro Hacker", "500 XP", "text-yellow-400"],
-                  ["Elite Contributor", "800 XP", "text-orange-400"],
-                  ["Legendary Coder", "1200 XP", "text-pink-400"],
-                  ["Open Source Knight ⚔️", "2000 XP", "text-amber-300"],
-                ].map(([rank, xp, color]) => (
-                  <div key={rank} className="flex items-center justify-between text-sm">
-                    <span className={`font-medium ${color}`}>{rank}</span>
-                    <span className="text-slate-500">{xp}</span>
-                  </div>
-                ))}
+            <Reveal delay="200ms">
+              <div className="p-5 rounded-2xl bg-white/5 border border-white/10">
+                <p className="text-xs font-semibold uppercase tracking-widest text-slate-500 mb-4">Rank ladder</p>
+                <div className="space-y-2">
+                  {[
+                    ["Newbie",              "0 XP",    "text-slate-400"],
+                    ["Rookie Committer",    "50 XP",   "text-green-400"],
+                    ["Code Explorer",       "150 XP",  "text-blue-400"],
+                    ["Skilled Dev",         "300 XP",  "text-purple-400"],
+                    ["Pro Hacker",          "500 XP",  "text-yellow-400"],
+                    ["Elite Contributor",   "800 XP",  "text-orange-400"],
+                    ["Legendary Coder",     "1200 XP", "text-pink-400"],
+                    ["Open Source Knight ⚔️","2000 XP","text-amber-300"],
+                  ].map(([rank, xp, color], i) => (
+                    <div key={rank} className="flex items-center justify-between text-sm group">
+                      <span className={`font-medium ${color} group-hover:translate-x-1 transition-transform duration-150`}>{rank}</span>
+                      <span className="text-slate-500">{xp}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            </Reveal>
           </div>
         </div>
       </section>
 
       {/* ── CTA ────────────────────────────────────── */}
       <section className="relative z-10 max-w-4xl mx-auto px-6 py-24">
-        <div className="relative rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-br from-purple-900/40 to-pink-900/20 p-12 text-center">
-          {/* Background accent */}
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-purple-500/20 blur-3xl rounded-full" />
+        <Reveal>
+          <div className="relative rounded-3xl overflow-hidden border border-white/10 bg-gradient-to-br from-purple-900/40 to-pink-900/20 p-12 text-center">
+            {/* Background accent */}
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-32 bg-purple-500/20 blur-3xl rounded-full" />
+            </div>
+            <div className="relative z-10">
+              <p className="text-sm font-semibold text-purple-400 uppercase tracking-widest mb-4">Start your quest</p>
+              <h2 className="text-4xl md:text-5xl font-extrabold mb-4">
+                Ready to become an{" "}
+                <GradientText from="from-purple-400" to="to-yellow-400">
+                  Open Source Knight?
+                </GradientText>
+              </h2>
+              <p className="text-slate-400 text-lg mb-8 max-w-xl mx-auto">
+                Connect your GitHub account in seconds. Your XP history starts building the moment you log in.
+              </p>
+              <button
+                onClick={handleConnect}
+                className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 font-bold text-lg transition-all duration-200 shadow-2xl shadow-purple-500/30 hover:scale-105 hover:shadow-purple-500/50"
+              >
+                <Github className="w-6 h-6" />
+                Connect with GitHub
+                <ArrowRight className="w-5 h-5" />
+              </button>
+              <p className="mt-4 text-xs text-slate-600">No credit card. No write access. Just your GitHub login.</p>
+            </div>
           </div>
-          <div className="relative z-10">
-            <p className="text-sm font-semibold text-purple-400 uppercase tracking-widest mb-4">Start your quest</p>
-            <h2 className="text-4xl md:text-5xl font-extrabold mb-4">
-              Ready to become an{" "}
-              <GradientText from="from-purple-400" to="to-yellow-400">
-                Open Source Knight?
-              </GradientText>
-            </h2>
-            <p className="text-slate-400 text-lg mb-8 max-w-xl mx-auto">
-              Connect your GitHub account in seconds. Your XP history starts building the moment you log in.
-            </p>
-            <button
-              onClick={handleConnect}
-              className="inline-flex items-center gap-2 px-8 py-4 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 font-bold text-lg transition-all duration-200 shadow-2xl shadow-purple-500/30 hover:scale-105"
-            >
-              <Github className="w-6 h-6" />
-              Connect with GitHub
-              <ArrowRight className="w-5 h-5" />
-            </button>
-            <p className="mt-4 text-xs text-slate-600">No credit card. No write access. Just your GitHub login.</p>
-          </div>
-        </div>
+        </Reveal>
       </section>
 
       {/* ── Footer ─────────────────────────────────── */}
