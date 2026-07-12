@@ -184,7 +184,7 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // ✅ TRUST PROXY (REQUIRED FOR RENDER)
-//app.set("trust proxy", 1);
+app.set("trust proxy", 1);
 
 // ✅ CORS (FIXED)
 const allowedOrigins = [
@@ -192,6 +192,8 @@ const allowedOrigins = [
    "http://localhost:5174",
    "http://localhost:5144",
   //"https://forknightt.netlify.app",
+  "https://forknight-svex.vercel.app",
+  process.env.FRONTEND_URL,
 ];
 
 app.use(
@@ -211,9 +213,9 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: false, // required for HTTPS (Render)
+      secure: true, // required for HTTPS (Render)
       httpOnly: true,
-      sameSite: "lax", // must be lowercase for cross-site
+      sameSite: "none", // must be lowercase for cross-site
     },
   }),
 );
@@ -278,7 +280,8 @@ app.get("/auth/github/callback", (req, res, next) => {
     "github",
     {
       //failureRedirect: "https://forknightt.netlify.app",
-      failureRedirect: "http://localhost:5144",
+      //failureRedirect: "http://localhost:5144",
+      failureRedirect: process.env.FRONTEND_URL,
       callbackURL: process.env.GITHUB_CALLBACK_URL,
     },
     (err, user, info) => {
@@ -310,7 +313,8 @@ app.get("/auth/github/callback", (req, res, next) => {
     console.error("Auto sync failed:", err);
   }
 
-  return res.redirect("http://localhost:5144/dashboard");
+  //return res.redirect("http://localhost:5144/dashboard");
+  return res.redirect(`${process.env.FRONTEND_URL}/dashboard`);
 });
     },
   )(req, res, next);

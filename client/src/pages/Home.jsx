@@ -181,7 +181,7 @@ const DashboardPreview = () => {
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-sm font-bold text-white shrink-0">N</div>
           <div>
-            <p className="text-sm font-semibold text-white">nihitakolukula</p>
+            <p className="text-sm font-semibold text-white">username</p>
             <p className="text-xs text-purple-400">Level 14 · Pro Hacker</p>
           </div>
           <div className="ml-auto text-right">
@@ -262,7 +262,7 @@ const Home = () => {
   }, []);
 
   const handleConnect = () => {
-    const base = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+    const base = import.meta.env.VITE_API_BASE_URL || "https://forknight-x1ob.onrender.com";
     window.location.href = `${base}/auth/github`;
   };
 

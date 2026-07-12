@@ -1,6 +1,6 @@
 // src/utils/api.js
 // Strip any trailing slash from the base URL to avoid double-slash paths
-const BASE = (import.meta.env.VITE_API_BASE_URL || "https://forknight-server.onrender.com").replace(/\/$/, "");
+const BASE = (import.meta.env.VITE_API_BASE_URL || "https://forknight-x1ob.onrender.com").replace(/\/$/, "");
 
 export const apiGet = async (path) => {
   const res = await fetch(`${BASE}${path}`, {
